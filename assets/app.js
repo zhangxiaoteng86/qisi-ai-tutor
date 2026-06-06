@@ -169,6 +169,7 @@
     $('qbar').innerHTML = '📐 <b>题目</b>：' + esc(problem.stem);
     $('chat-title').textContent = problem.title + (llmActive() ? ' · AI 模式' : '');
     $('msgs').innerHTML = '';
+    updateProgress();
     if (!restore) addPhotoBubble();
     dispatch(E.start(session));
   }
@@ -187,12 +188,27 @@
         () => renderInput({ messages: [], chips: [], done: false }));
     });
   }
+  const DOTS = '<div class="bub typing-dots"><span></span><span></span><span></span></div>';
   function addThinking() {
     const r = document.createElement('div'); r.className = 'row ai typing';
-    r.innerHTML = '<div class="av">启</div><div class="bub">正在思考…</div>';
+    r.innerHTML = '<div class="av">启</div>' + DOTS;
     $('msgs').appendChild(r); scrollDown(); return r;
   }
   function removeThinking(r) { if (r && r.parentNode) r.remove(); }
+
+  // 聊天顶部：步骤进度 + 提示阶梯指示器（把产品核心机制可视化）
+  function updateProgress() {
+    const el = $('chat-progress'); if (!el || !session) return;
+    const hl = session.hintLevel || 0;
+    const pips = [1, 2, 3, 4].map(i => '<span class="pip' + (i <= hl ? ' on' : '') + '">' + '①②③④'[i - 1] + '</span>').join('');
+    let stepTxt;
+    if (!llmActive()) {
+      const n = session.problem.steps.length;
+      stepTxt = session.status === 'active' ? '第 ' + Math.min(session.stepIndex + 1, n) + ' / ' + n + ' 步' : '已完成 ✓';
+    } else { stepTxt = '🤖 AI 引导中'; }
+    el.innerHTML = '<span class="cp-step">' + stepTxt + '</span>' +
+      '<span class="cp-hints">提示阶梯 <span class="pips">' + pips + '</span></span>';
+  }
   function resume() {
     const r = S.getResume();
     if (!r) return;
@@ -235,7 +251,7 @@
       if (i >= messages.length) { if (done) done(); return; }
       const m = messages[i++];
       const typing = document.createElement('div'); typing.className = 'row ai typing';
-      typing.innerHTML = '<div class="av">启</div><div class="bub">正在思考…</div>';
+      typing.innerHTML = '<div class="av">启</div>' + DOTS;
       $('msgs').appendChild(typing); scrollDown();
       setTimeout(() => {
         typing.remove();
@@ -249,6 +265,7 @@
   }
 
   function renderInput(out) {
+    updateProgress();
     const bar = $('inputbar');
     if (out.done) {
       bar.innerHTML = '<div class="chips">' +

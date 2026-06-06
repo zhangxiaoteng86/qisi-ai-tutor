@@ -162,6 +162,38 @@ p.sub{color:#5a6473;font-size:13px;margin-bottom:18px;text-align:center}
 .ev.leak .t{color:var(--red)}
 .fab{position:absolute;right:12px;bottom:70px;background:var(--dark);color:#fff;border:0;border-radius:20px;padding:8px 12px;font-size:11px;font-weight:700;cursor:pointer;z-index:15;box-shadow:0 4px 12px rgba(0,0,0,.25)}
 
+/* ---- motion & polish ---- */
+.msgs .row{animation:msgIn .26s ease both}
+@keyframes msgIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.typing-dots{display:inline-flex !important;gap:4px;align-items:center;padding:13px 14px !important}
+.typing-dots span{width:6px;height:6px;border-radius:50%;background:#9aa3b2;display:inline-block;animation:blink 1.2s infinite}
+.typing-dots span:nth-child(2){animation-delay:.18s}
+.typing-dots span:nth-child(3){animation-delay:.36s}
+@keyframes blink{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
+
+.fill{transform-origin:left;animation:grow .55s cubic-bezier(.4,0,.2,1) both}
+@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+
+.qcard{transition:transform .12s,box-shadow .12s}
+.qcard:hover{box-shadow:0 5px 16px rgba(31,56,100,.10)}
+.shoot,.report-btn,.btn-primary,.btn-ghost,.send{transition:transform .1s,filter .12s}
+.shoot:active,.report-btn:active,.btn-primary:active,.btn-ghost:active,.send:active{transform:scale(.98)}
+.chip{transition:transform .1s,background .12s}
+.tabbar button .ic{transition:transform .16s}
+.tabbar button.on .ic{transform:translateY(-1px) scale(1.1)}
+.linkrow{transition:background .12s}
+.linkrow:hover{background:#f7f9fd}
+
+/* chat hint-ladder + step indicator (展示产品核心机制) */
+.chat-progress{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  background:#fff;border-bottom:1px solid #eef1f6;padding:7px 14px}
+.cp-step{font-size:11px;color:#6b7280;font-weight:600;white-space:nowrap}
+.cp-hints{display:flex;align-items:center;gap:5px;font-size:10.5px;color:#9aa3b2}
+.cp-hints .pips{display:inline-flex;gap:4px}
+.pip{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+  font-size:11px;background:#eef1f6;color:#b6bdca;transition:all .25s}
+.pip.on{background:#fff3e0;color:#e67e22;font-weight:700;box-shadow:0 0 0 1px #ffd98a inset}
+
 /* LLM settings */
 .llm-opt{display:flex;gap:9px;align-items:flex-start;font-size:13px;color:#374151;margin-bottom:10px;line-height:1.5;cursor:pointer}
 .llm-opt input{margin-top:3px}
