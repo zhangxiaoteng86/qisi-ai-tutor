@@ -5,7 +5,7 @@
 
 依据自写的《启思 AI 家教 · 产品需求文档 PRD v1.0》实现。**不是写死的点击 Demo**——对话状态机、答案等价判定、掌握度、错题本、家长周报全部是实时算出来的，数据存浏览器本地（刷新不丢）。纯前端、零构建、双击即跑。
 
-🔗 **在线体验**：部署到 GitHub Pages 后填到这里 → `https://<your-name>.github.io/qisi-ai-tutor/`
+🔗 **在线体验**：`https://zhangxiaoteng86.github.io/qisi-ai-tutor/`（推送 + 开启 Pages 后即可访问）
 
 ---
 
@@ -94,7 +94,7 @@ server.js             预览用极简静态服务器（零依赖）
 1. 推到 GitHub；
 2. 仓库 **Settings → Pages → Build and deployment → Deploy from a branch**；
 3. 选 `main` 分支、`/ (root)` 目录，保存；
-4. 等一两分钟，访问 `https://<your-name>.github.io/<repo>/`。
+4. 等一两分钟，访问 `https://zhangxiaoteng86.github.io/qisi-ai-tutor/`。
 
 （仓库内含 `.nojekyll`，避免 Jekyll 处理静态资源。）
 
