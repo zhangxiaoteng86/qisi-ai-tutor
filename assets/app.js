@@ -46,9 +46,8 @@
   function renderHome() {
     const rate = S.independentRate();
     const rateTxt = rate == null ? '—' : Math.round(rate * 100) + '%';
-    const wb = S.wrongbook();
     const resume = S.getResume();
-    const weak = S.masteryList()[0];
+    const due = S.dueReviews();
 
     let resumeHtml = '';
     if (resume) {
@@ -58,11 +57,24 @@
         '<div class="qcard" onclick="QisiApp.resume()"><div class="badge">📐</div>' +
         '<div><div class="t">' + esc(p.title) + '</div><div class="d">上次进行到第 ' + (resume.stepIndex + 1) + ' 步，点我继续</div></div></div>';
     }
-    let recHtml = '';
-    if (weak) recHtml =
-      '<div class="sec-title">今日推荐复习</div>' +
-      '<div class="qcard" onclick="QisiApp.practiceKnowledge(\'' + weak.id + '\')"><div class="badge">🔁</div>' +
-      '<div><div class="t">' + esc(weak.name) + '</div><div class="d">掌握度「' + weak.tier + '」，建议今天巩固一次</div></div></div>';
+
+    // 今日待复习（遗忘曲线驱动）—— 点开服务一道「同类变式题」
+    let revHtml = '<div class="sec-title">今日待复习 · 遗忘曲线</div>';
+    if (due.length) {
+      revHtml += due.map(r => {
+        const due_lbl = r.overdueDays > 0 ? '已逾期 ' + r.overdueDays + ' 天' : '今天到期';
+        const color = r.tier === '薄弱' ? 'var(--orange)' : r.tier === '一般' ? 'var(--amber)' : 'var(--ok)';
+        return '<div class="qcard" onclick="QisiApp.practiceKnowledge(\'' + r.id + '\')"><div class="badge">🔁</div>' +
+          '<div><div class="t">' + esc(r.name) + '</div><div class="d">' + due_lbl +
+          ' · 掌握度 <b style="color:' + color + '">' + r.tier + '</b> · 点我练一道<b>变式题</b></div></div></div>';
+      }).join('');
+    } else if (S.totalGuided() > 0) {
+      const nx = S.nextReview();
+      revHtml += '<div class="empty" style="padding:18px">✅ 今天没有到期的复习啦~' +
+        (nx ? '<br>下一次复习：<b>' + esc(nx.name) + '</b>（约 ' + nx.inDays + ' 天后）' : '') + '</div>';
+    } else {
+      revHtml = '';
+    }
 
     $('view-home').innerHTML =
       '<div class="hero"><h2>晚上好，朵朵 👋</h2>' +
@@ -70,9 +82,9 @@
       '<button class="shoot" onclick="QisiApp.gotoShoot()">📷 拍题求助</button></div>' +
       '<div class="cardrow">' +
       '<div class="mini"><div class="n">' + rateTxt + '</div><div class="l">本周独立做出率</div></div>' +
-      '<div class="mini"><div class="n">' + wb.length + '</div><div class="l">待复习错题</div></div></div>' +
-      resumeHtml + recHtml +
-      (resumeHtml || recHtml ? '' : '<div class="empty"><span class="big">📷</span>还没有学习记录，点上面「拍题求助」开始第一道题吧！</div>');
+      '<div class="mini"><div class="n">' + due.length + '</div><div class="l">今日待复习</div></div></div>' +
+      resumeHtml + revHtml +
+      (resumeHtml || revHtml ? '' : '<div class="empty"><span class="big">📷</span>还没有学习记录，点上面「拍题求助」开始第一道题吧！</div>');
   }
   function gotoShoot() { markTab('tab-student', 'shoot'); tab('shoot'); }
 
@@ -187,8 +199,12 @@
     const p = D.problemById(r.problemId);
     if (p) { markTab('tab-student', 'home'); openChat(p, r); }
   }
+  // 复习时服务一道「同类变式题」：同知识点、尽量不重复上次那道
   function practiceKnowledge(kid) {
-    const p = D.PROBLEMS.find(x => x.knowledgeId === kid) || D.PROBLEMS[0];
+    const probs = D.PROBLEMS.filter(x => x.knowledgeId === kid);
+    const solved = S.events().filter(e => e.type === 'guide_solved' && e.knowledgeId === kid);
+    const lastId = solved.length ? solved[solved.length - 1].problemId : null;
+    const p = probs.find(x => x.id !== lastId) || probs[0] || D.PROBLEMS[0];
     S.track('review_start', { knowledgeId: kid, problemId: p.id });
     openChat(p, null);
   }
@@ -350,7 +366,14 @@
       '<div class="advice">' + meAdvice(avg, total) + '</div>' +
       '<div class="linkrow" onclick="QisiApp.openDrawer()"><span>📊 查看埋点事件流</span><span class="r">PRD 第 9 章 ›</span></div>' +
       '<div class="linkrow" onclick="QisiApp.openLLM()"><span>🤖 AI 内核</span><span class="r">' + llmStatusLabel() + '</span></div>' +
+      '<div class="linkrow" onclick="QisiApp.fastForward()"><span>⏩ 模拟过一天</span><span class="r">' +
+        (S.timeOffsetDays() > 0 ? '已快进 ' + S.timeOffsetDays() + ' 天 · ' : '') + '演示遗忘曲线 ›</span></div>' +
       '<div class="linkrow" onclick="QisiApp.resetAll()" style="color:#c0392b"><span>♻️ 重置体验数据</span><span class="r">清空本地记录 ›</span></div>';
+  }
+  function fastForward() {
+    S.fastForwardDays(1);
+    renderMe();
+    toast('已模拟过 1 天 ⏩ 回首页看「今日待复习」会有变化');
   }
   function meAdvice(avg, total) {
     if (!total) return '还没有学习记录哦，去拍一道题，我陪你想出来 💪';
@@ -490,7 +513,7 @@
     choose, sendInput, hint, giveFull, continueThink, terminalChip,
     genReport, shareReport,
     openDrawer, closeDrawer, onEvent, resetAll,
-    openLLM, closeLLM, saveLLM
+    openLLM, closeLLM, saveLLM, fastForward
   };
 
   document.addEventListener('DOMContentLoaded', () => { setRole('student'); });

@@ -15,10 +15,14 @@
     wrongbook: [],       // 错题本记录 {problemId, knowledgeId, reason, masteryTagAtEntry, ts}
     resume: null,        // 「继续上次」未完成的会话快照
     weekSnapshots: [],   // 每次生成周报时的快照，用于环比
+    reviewSched: {},     // 遗忘曲线复习计划 {kid: {stage, lastTs, dueTs}}
+    timeOffsetMs: 0,     // 演示用「时间快进」偏移（让遗忘曲线在几秒内可见）
     createdAt: Date.now()
   });
 
   let state = load();
+  // 统一时间源：真实时间 + 演示偏移。复习到期判断、埋点时间戳都走它。
+  function now() { return Date.now() + (state.timeOffsetMs || 0); }
 
   function load() {
     try {
@@ -34,8 +38,10 @@
 
   /* ---------- 埋点 ---------- */
   function track(type, payload) {
-    const ev = Object.assign({ type: type, ts: Date.now() }, payload || {});
+    const ev = Object.assign({ type: type, ts: now() }, payload || {});
     state.events.push(ev);
+    // 每次终局自动推进遗忘曲线复习计划（无需引擎感知）
+    if (type === 'guide_solved' && ev.knowledgeId) updateReviewSched(ev.knowledgeId, ev.independent === true);
     save();
     if (global.QisiApp && global.QisiApp.onEvent) global.QisiApp.onEvent(ev);
     return ev;
@@ -46,7 +52,7 @@
   // 入库条件：用过 ③/④ 档提示 或 某步连续答错≥3次 或 最终未独立做出
   function addWrong(rec) {
     state.wrongbook = state.wrongbook.filter(w => w.problemId !== rec.problemId);
-    state.wrongbook.push(Object.assign({ ts: Date.now() }, rec));
+    state.wrongbook.push(Object.assign({ ts: now() }, rec));
     save();
   }
   function removeWrong(problemId) {
@@ -112,9 +118,46 @@
     return Math.max(days.size, state.events.length ? 1 : 0);
   }
 
+  /* ---------- 遗忘曲线复习计划（PRD 3.1 / 6.3.3 · 智能复习推送） ----------
+   * 简化版 SM-2：每个知识点维护一个 stage，独立做对则升档（下次间隔更长），
+   * 失败则回到 stage 0（很快再练）。到期(dueTs ≤ now)的知识点进入「今日待复习」。
+   */
+  const DAY_MS = 24 * 3600 * 1000;
+  const REVIEW_DAYS = [1, 2, 4, 7, 15, 30];   // stage → 距下次复习的天数
+  function updateReviewSched(kid, success) {
+    const cur = state.reviewSched[kid] || { stage: 0 };
+    let stage, dueIn;
+    if (success) { stage = Math.min((cur.stage || 0) + 1, REVIEW_DAYS.length - 1); dueIn = REVIEW_DAYS[stage]; }
+    else { stage = 0; dueIn = 0; }              // 没做出来 → 今天就该再练
+    state.reviewSched[kid] = { stage: stage, lastTs: now(), dueTs: now() + dueIn * DAY_MS };
+  }
+  // 到期待复习列表：dueTs ≤ now，按逾期程度 + 薄弱优先排序
+  function dueReviews() {
+    const t = now();
+    return Object.keys(state.reviewSched)
+      .map(kid => {
+        const s = state.reviewSched[kid], m = masteryFor(kid);
+        return { id: kid, name: D.knowledgeName(kid), tier: m.tier, score: m.score,
+                 dueTs: s.dueTs, stage: s.stage, overdueDays: Math.floor((t - s.dueTs) / DAY_MS) };
+      })
+      .filter(r => r.dueTs <= t)
+      .sort((a, b) => (b.overdueDays - a.overdueDays) || (a.score - b.score));
+  }
+  // 下一个未到期复习（用于「今日无复习」时给个预告）
+  function nextReview() {
+    const t = now();
+    const up = Object.keys(state.reviewSched)
+      .map(kid => ({ id: kid, name: D.knowledgeName(kid), dueTs: state.reviewSched[kid].dueTs }))
+      .filter(r => r.dueTs > t).sort((a, b) => a.dueTs - b.dueTs)[0];
+    if (!up) return null;
+    return { name: up.name, inDays: Math.max(1, Math.ceil((up.dueTs - t) / DAY_MS)) };
+  }
+  function fastForwardDays(n) { state.timeOffsetMs = (state.timeOffsetMs || 0) + n * DAY_MS; save(); }
+  function timeOffsetDays() { return Math.round((state.timeOffsetMs || 0) / DAY_MS); }
+
   /* ---------- 家长周报数据（PRD 6.4） ---------- */
   function buildReport() {
-    const since = Date.now() - WEEK_MS;
+    const since = now() - WEEK_MS;
     const solved = solvedEvents(since);
     const last = state.weekSnapshots.length ? state.weekSnapshots[state.weekSnapshots.length - 1] : null;
 
@@ -166,7 +209,7 @@
 
   // 生成周报后存快照，供下次环比
   function snapshotReport(r) {
-    state.weekSnapshots.push({ ts: Date.now(), rate: r.rate, avgHint: r.avgHint, guidedCount: r.guidedCount });
+    state.weekSnapshots.push({ ts: now(), rate: r.rate, avgHint: r.avgHint, guidedCount: r.guidedCount });
     save();
   }
 
@@ -177,6 +220,7 @@
     masteryFor, masteryList,
     independentRate, avgHintLevel, totalGuided, streakDays,
     buildReport, snapshotReport,
+    dueReviews, nextReview, fastForwardDays, timeOffsetDays,
     reset, _raw: () => state
   };
 })(window);
