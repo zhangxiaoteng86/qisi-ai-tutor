@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>启思 AI 家教 · MVP</title>
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+  <h1 class="title">启思 AI 家教 · MVP</h1>
+  <p class="sub">拍题 → 苏格拉底式引导（不给答案）→ 分层提示 → 数据闭环 → 家长周报</p>
+
+  <div class="stage">
+    <!-- PHONE -->
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>9:41</span><span>启思 · 5G ▮▮▮</span></div>
+
+      <div class="appbar">
+        <span class="logo">启思 AI 家教</span>
+        <span class="tag">不给答案 · 启发式</span>
+      </div>
+      <div class="role-wrap">
+        <div class="switch">
+          <button id="roleStudent" class="on" onclick="QisiApp.setRole('student')">👦 学生端</button>
+          <button id="roleParent" onclick="QisiApp.setRole('parent')">👨‍👩‍👧 家长端</button>
+        </div>
+      </div>
+
+      <div class="screen" id="screen">
+        <!-- 学生：首页 -->
+        <div class="view on" id="view-home"></div>
+        <!-- 学生：拍题 -->
+        <div class="view" id="view-shoot"></div>
+        <!-- 学生：错题本 + 知识图谱 -->
+        <div class="view" id="view-book"></div>
+        <!-- 学生：我的 -->
+        <div class="view" id="view-me"></div>
+        <!-- 家长：周报 -->
+        <div class="view" id="view-parent"></div>
+
+        <!-- 引导对话（全屏覆盖层） -->
+        <div id="view-chat">
+          <div class="chat-top">
+            <button class="back" onclick="QisiApp.backFromChat()">‹ 返回</button>
+            <span class="ttl" id="chat-title">引导对话</span>
+          </div>
+          <div class="qbar" id="qbar"></div>
+          <div class="msgs" id="msgs"></div>
+          <div class="inputbar" id="inputbar"></div>
+        </div>
+
+        <!-- 埋点事件面板 -->
+        <div class="drawer" id="drawer">
+          <div class="panel">
+            <div class="ph"><b>📊 埋点事件流（PRD 第 9 章）</b>
+              <button onclick="QisiApp.closeDrawer()">✕</button></div>
+            <div class="evlist" id="evlist"></div>
+          </div>
+        </div>
+
+        <!-- AI 内核设置（BYOK） -->
+        <div class="drawer" id="llm-drawer">
+          <div class="panel">
+            <div class="ph"><b>🤖 AI 内核设置</b>
+              <button onclick="QisiApp.closeLLM()">✕</button></div>
+            <div class="evlist" id="llm-body" style="padding:16px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 学生 tabbar -->
+      <div class="tabbar" id="tab-student">
+        <button class="on" data-v="home" onclick="QisiApp.tab('home',this)"><span class="ic">🏠</span>首页</button>
+        <button data-v="shoot" onclick="QisiApp.tab('shoot',this)"><span class="ic">📷</span>拍题</button>
+        <button data-v="book" onclick="QisiApp.tab('book',this)"><span class="ic">📒</span>错题本</button>
+        <button data-v="me" onclick="QisiApp.tab('me',this)"><span class="ic">👤</span>我的</button>
+      </div>
+      <!-- 家长 tabbar -->
+      <div class="tabbar" id="tab-parent" style="display:none">
+        <button class="on" data-v="parent" onclick="QisiApp.tab('parent',this)"><span class="ic">📊</span>周报</button>
+        <button data-v="book" onclick="QisiApp.tab('book',this)"><span class="ic">📒</span>错题本</button>
+      </div>
+    </div>
+
+    <!-- 说明栏 -->
+    <div style="max-width:320px">
+      <div class="legend">
+        <b>这是「能跑逻辑」的 MVP 原型</b>，不是写死的演示——状态机、判定、掌握度、周报都是实时算出来的，数据存在浏览器本地（刷新不丢）。
+
+        <h4>怎么体验</h4>
+        ① 默认「学生端」。首页点 <b>📷 拍题求助</b> → 选一道示例题 → 确认题干。<br>
+        ② 进入引导：AI <b>不直接给答案</b>，每次只问一步。可点蓝色气泡，也可<b>直接打字作答</b>（支持等价判定，如 <code>x=4</code> 与 <code>4</code>）。<br>
+        ③ 卡住点 <b>💡 我想要提示</b>，4 档逐级揭示（不可跳档）；连续答错 3 次会自动升档。<br>
+        ④ <b>独立做出</b>不进错题本；<b>用到④档</b>记「已给答案」并入错题本。<br>
+        ⑤ 去「错题本」看真实<b>知识图谱</b>，「我的」看成长数据与<b>埋点面板</b>。<br>
+        ⑥ 顶部切「家长端」→ <b>生成周报</b>（按本周真实数据，数据少出友好版）。
+
+        <h4>对应的 PRD 能力</h4>
+        <span class="kbadge">6.2 引导状态机</span><span class="kbadge">6.2.3 提示阶梯</span>
+        <span class="kbadge">6.2.4 等价判定</span><span class="kbadge">7.3 防泄题校验</span>
+        <span class="kbadge">6.3 错题/掌握度</span><span class="kbadge">6.4 家长周报</span>
+        <span class="kbadge">第9章 埋点</span><span class="kbadge">LLM 可插拔</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 模块顺序：数据 → 状态 → LLM 适配器 → 引擎 → UI（非 module，双击即可运行） -->
+  <script src="assets/data.js"></script>
+  <script src="assets/store.js"></script>
+  <script src="assets/llm-adapter.js"></script>
+  <script src="assets/engine.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

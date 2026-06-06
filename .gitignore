@@ -1,0 +1,17 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/
+
+# Claude Code / local tooling
+.claude/
+
+# Node (future-proofing)
+node_modules/
+
+# Secrets — never commit keys (AI-mode key lives in browser localStorage, not files)
+.env
+.env.*
+*.key
