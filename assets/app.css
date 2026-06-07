@@ -194,6 +194,14 @@ p.sub{color:#5a6473;font-size:13px;margin-bottom:18px;text-align:center}
   font-size:11px;background:#eef1f6;color:#b6bdca;transition:all .25s}
 .pip.on{background:#fff3e0;color:#e67e22;font-weight:700;box-shadow:0 0 0 1px #ffd98a inset}
 
+/* RAG card (检索可视化) */
+.rag{background:#f3f8f4;border:1px solid #d6e8da;border-radius:14px;padding:12px 14px;margin-bottom:12px}
+.rag-h{font-size:12px;font-weight:700;color:#1f7a44;margin-bottom:8px}
+.rag-h i{font-weight:400;color:#7aa888;font-style:normal;font-size:11px}
+.rag-item{font-size:12px;color:#365846;line-height:1.6;margin-bottom:6px}
+.rag-item:last-child{margin-bottom:0}
+.rag-type{display:inline-block;font-size:10px;background:#dcefe3;color:#1f7a44;border-radius:6px;padding:1px 6px;margin-right:6px}
+
 /* LLM settings */
 .llm-opt{display:flex;gap:9px;align-items:flex-start;font-size:13px;color:#374151;margin-bottom:10px;line-height:1.5;cursor:pointer}
 .llm-opt input{margin-top:3px}

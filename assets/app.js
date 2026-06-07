@@ -133,6 +133,15 @@
       stem = stem.replace('24', '<span class="suspect">24</span>');
       suspectTip = '<div style="font-size:11px;color:var(--red);margin-bottom:8px">⚠️ 标红处识别置信度较低，请核对是否正确</div>';
     }
+    // RAG：从知识库检索本题关联的课标知识，可视化展示（AI 模式下还会注入提示词）
+    const hits = (global.QisiRAG ? QisiRAG.retrieve(p.stem, p.knowledgeId, 2) : []);
+    if (hits.length) S.track('rag_retrieve', { problemId: p.id, knowledgeId: p.knowledgeId, hits: hits.map(h => h.id).join(',') });
+    const ragHtml = hits.length
+      ? '<div class="rag"><div class="rag-h">📚 关联知识点资料 <i>· 检索自知识库（RAG）</i></div>' +
+        hits.map(h => '<div class="rag-item"><span class="rag-type">' + esc(h.type) + '</span>' +
+          '<b>' + esc(h.title) + '</b>：' + esc(h.text) + '</div>').join('') + '</div>'
+      : '';
+
     $('view-shoot').innerHTML =
       '<div class="confirm">' +
       '<div class="lab">识别结果 · 请确认</div>' +
@@ -142,6 +151,7 @@
       '<div class="lab">知识点标签</div>' +
       '<div class="tagrow">' + p.tags.map(t => '<span class="ktag">' + esc(t) + '</span>').join('') + '</div>' +
       '</div>' +
+      ragHtml +
       '<div class="confirm-q">识别对了吗？</div>' +
       '<div class="cambtns">' +
       '<button class="btn-primary" onclick="QisiApp.confirmOCR()">✅ 没问题，开始引导</button>' +

@@ -57,9 +57,20 @@
 
   function kickoff(p) {
     const steps = p.steps.map((s, i) => (i + 1) + '. ' + stripTags(s.ask) + '（参考答案要点：' + s.accept[0] + '）').join('\n');
+    // RAG：检索本题关联的课标知识，注入提示词为模型「接地」（PRD 7.1）
+    let ragBlock = '';
+    if (global.QisiRAG) {
+      const hits = QisiRAG.retrieve(p.stem, p.knowledgeId, 3);
+      if (hits.length) {
+        ragBlock = '参考知识（检索自知识库，引导时据此保证内容正确、与课内对齐）：\n' + QisiRAG.asContext(hits) + '\n\n';
+        if (global.QisiStore) QisiStore.track('rag_retrieve', { problemId: p.id, knowledgeId: p.knowledgeId, hits: hits.map(h => h.id).join(','), via: 'llm' });
+      }
+    }
     return [
       '题目：' + p.stem,
       '知识点：' + (p.tags || []).join('、'),
+      '',
+      ragBlock +
       '标准解法步骤（仅供你参考，不要直接念给学生）：',
       steps,
       '完整解答（仅在第 ④ 档才可给）：' + stripTags(p.fullSolution),
