@@ -30,6 +30,13 @@ node server.js     # → http://localhost:5173
 打开后默认「学生端」。首页点 **📷 拍题求助** → 选一道示例题 → 确认题干 → 进入引导对话。
 顶部可切「家长端」生成学情周报；「我的 → 埋点事件流」看全链路事件。
 
+## 🧪 测试
+
+浏览器测试套件（无需任何依赖）：打开 `tests/test.html`，或访问线上
+`https://zhangxiaoteng86.github.io/qisi-ai-tutor/tests/test.html`，可看到 **22 条断言**
+实时跑通，覆盖：答案等价判定、题库全可解、提示阶梯不跳档、**防泄题拦截**、
+错题本归集、掌握度计算、遗忘曲线调度、RAG 检索。只加载逻辑模块、不含 UI，纯断言。
+
 ## 🤖 AI 模式（BYOK，可选）
 
 默认走规则脚本，**无需任何 Key**。想体验真实大模型引导：
@@ -83,6 +90,7 @@ assets/engine.js      苏格拉底引导引擎：状态机 + 等价判定 + 提�
 assets/llm-adapter.js AI 模式适配器（BYOK 浏览器直连 Claude）；默认不启用
 assets/app.js         UI 控制层
 server.js             预览用极简静态服务器（零依赖）
+tests/test.html       浏览器测试套件（22 条断言，覆盖核心逻辑）
 ```
 
 ## 🛠️ 技术

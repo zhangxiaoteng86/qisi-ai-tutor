@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>启思 AI 家教 · 测试套件</title>
+<style>
+  body{font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;background:#0f1320;color:#e6e9f0;
+    margin:0;padding:28px 18px;line-height:1.5}
+  h1{font-size:20px;margin:0 0 4px}
+  .sub{color:#8b93a3;font-size:13px;margin-bottom:18px}
+  #summary{font-size:15px;font-weight:700;padding:12px 16px;border-radius:12px;margin-bottom:16px;display:inline-block}
+  .ok{background:#10311f;color:#7ee2a8;border:1px solid #1f7a44}
+  .bad{background:#3a1620;color:#ff9aa9;border:1px solid #c0392b}
+  .grp{font-size:12px;color:#7aa2ff;font-weight:700;margin:18px 0 6px;text-transform:uppercase;letter-spacing:.04em}
+  .case{display:flex;gap:10px;align-items:baseline;padding:6px 10px;border-radius:8px;font-size:13px;margin-bottom:3px;background:#161b2e}
+  .case .i{flex-shrink:0;width:16px}
+  .case.pass .i{color:#7ee2a8}
+  .case.fail{background:#241019}
+  .case.fail .i{color:#ff9aa9}
+  .case .err{color:#ff9aa9;font-size:12px;margin-left:auto;font-family:ui-monospace,Consolas,monospace}
+  code{background:#1f2742;padding:1px 5px;border-radius:5px;font-size:12px}
+  a{color:#7aa2ff}
+</style>
+</head>
+<body>
+  <h1>启思 AI 家教 · 测试套件</h1>
+  <div class="sub">在浏览器里运行核心逻辑的断言（引导引擎 / 判定 / 提示阶梯 / 防泄题 / 错题本 / 掌握度 / 遗忘曲线 / RAG）。返回 <a href="../index.html">← 回到应用</a></div>
+  <div id="summary">运行中…</div>
+  <div id="results"></div>
+
+  <!-- 仅加载「逻辑」模块（不含 UI 层 app.js） -->
+  <script src="../assets/data.js"></script>
+  <script src="../assets/kb.js"></script>
+  <script src="../assets/store.js"></script>
+  <script src="../assets/llm-adapter.js"></script>
+  <script src="../assets/engine.js"></script>
+  <script>
+  (function () {
+    const E = QisiEngine, D = QisiData, S = QisiStore, R = QisiRAG;
+    const groups = [];
+    const promises = [];
+    let cur = null;
+    function group(name) { cur = { name: name, cases: [] }; groups.push(cur); }
+    function test(name, fn) {
+      const c = { name: name, pass: true, err: '' };
+      cur.cases.push(c);
+      try {
+        S.reset();
+        const r = fn();
+        if (r && typeof r.then === 'function') {
+          promises.push(r.then(function () {}, function (e) { c.pass = false; c.err = (e && e.message) || String(e); }));
+        }
+      } catch (e) { c.pass = false; c.err = (e && e.message) || String(e); }
+    }
+    function assert(cond, msg) { if (!cond) throw new Error(msg || 'assertion failed'); }
+    function eq(a, b, msg) { if (a !== b) throw new Error((msg || '') + ' expected=' + b + ' got=' + a); }
+
+    // 脚本跑完一道题（用每步标准答案）
+    function solveIndep(id) { const p = D.problemById(id), s = E.createSession(p, null); E.start(s); p.steps.forEach(st => E.submit(s, st.accept[0])); return s; }
+    function solveGiven(id) { const p = D.problemById(id), s = E.createSession(p, null); E.start(s); for (let i = 0; i < 6; i++) { if ((E.requestHint(s) || {}).done) break; } return s; }
+
+    /* ---------- 答案判定与等价归一 ---------- */
+    group('答案判定 · 等价归一 (PRD 6.2.4)');
+    test('x=4 与 4 等价', () => assert(E._judge('x=4', ['4'])));
+    test('全角空格/符号归一：x ＝ 4 ≡ 4', () => assert(E._judge('x ＝ 4', ['4'])));
+    test('x² 与 x^2 等价', () => assert(E._judge('x²+2x-24=0', ['x^2+2x-24=0'])));
+    test('带单位 4 米 ≡ 4', () => assert(E._judge('4 米', ['4'])));
+    test('错误答案被拒：6 ≠ 4', () => assert(!E._judge('6', ['4'])));
+    test('空输入被拒', () => assert(!E._judge('', ['4'])));
+
+    /* ---------- 题库可解性 ---------- */
+    group('题库可解性 · 全部独立可解');
+    test('14 道题按标准答案均「独立做出」(hintLevel 0)', () => {
+      eq(D.PROBLEMS.length, 14, '题目数');
+      D.PROBLEMS.forEach(p => {
+        const s = E.createSession(p, null); E.start(s);
+        let last; p.steps.forEach(st => last = E.submit(s, st.accept[0]));
+        assert(s.status === 'solved' && last.independent && s.hintLevel === 0, p.id + ' 未独立做出');
+      });
+    });
+    test('每个知识点 ≥ 2 道题', () => {
+      const cov = {}; D.PROBLEMS.forEach(p => cov[p.knowledgeId] = (cov[p.knowledgeId] || 0) + 1);
+      Object.keys(cov).forEach(k => assert(cov[k] >= 2, k + ' 仅 ' + cov[k] + ' 道'));
+    });
+    test('没有干扰项被误判为正确', () => {
+      D.PROBLEMS.forEach(p => p.steps.forEach((st, i) => {
+        const acc = st.accept.map(E._normalize);
+        st.chips.forEach(c => {
+          const intended = acc.indexOf(E._normalize(c)) >= 0 || acc.indexOf(E._normalize(c).replace(/^x=/, '')) >= 0;
+          if (!intended) assert(!E._judge(c, st.accept), p.id + ' step' + i + ' 干扰项「' + c + '」被误判');
+        });
+      }));
+    });
+
+    /* ---------- 提示阶梯 ---------- */
+    group('提示阶梯 (PRD 6.2.3)');
+    test('严格不跳档：每次只升一档', () => {
+      const p = D.problemById('p_garden'), s = E.createSession(p, null); E.start(s);
+      eq(s.hintLevel, 0, '初始档'); E.requestHint(s); eq(s.hintLevel, 1, '①'); E.requestHint(s); eq(s.hintLevel, 2, '②'); E.requestHint(s); eq(s.hintLevel, 3, '③');
+    });
+    test('第④档 = 完整解答 → 终局「已给答案」', () => {
+      const p = D.problemById('p_garden'), s = E.createSession(p, null); E.start(s);
+      let o; for (let i = 0; i < 4; i++) o = E.requestHint(s);
+      assert(o.done && o.terminal === 'given' && !o.independent, '第④档应终局已给答案');
+    });
+    test('连续答错 3 次自动升档 (PRD 6.2.5)', () => {
+      const p = D.problemById('p_garden'), s = E.createSession(p, null); E.start(s);
+      E.submit(s, '错'); E.submit(s, '错'); const o = E.submit(s, '错');
+      assert(s.hintLevel >= 1, '应自动升一档'); assert(o.messages.length >= 1);
+    });
+
+    /* ---------- 错题本与掌握度 ---------- */
+    group('错题本与掌握度 (PRD 6.3)');
+    test('独立做出 → 不入错题本', () => { solveIndep('p_garden'); assert(S.wrongbook().length === 0, '独立做出不应入本'); });
+    test('用到④档（已给答案）→ 入错题本', () => { solveGiven('p_garden'); assert(S.wrongbook().some(w => w.problemId === 'p_garden'), '应入错题本'); });
+    test('掌握度三档可计算', () => {
+      solveIndep('p_linear_func2'); solveIndep('p_linear_func2');
+      const m = S.masteryFor('linear_func'); assert(['薄弱', '一般', '牢固'].indexOf(m.tier) >= 0); assert(m.score >= 0 && m.score <= 100);
+    });
+
+    /* ---------- 遗忘曲线复习 ---------- */
+    group('遗忘曲线智能复习 (PRD 3.1 / 6.3.3)');
+    test('独立做对 → 排到将来，不立即到期', () => { solveIndep('p_garden'); assert(S.dueReviews().every(r => r.id !== 'quad_app'), '刚做对不应到期'); });
+    test('未做出 → 当天到期', () => { solveGiven('p_factor2'); assert(S.dueReviews().some(r => r.id === 'factor'), '失败应当天到期'); });
+    test('快进数天 → 已学知识点到期', () => { solveIndep('p_garden'); assert(S.dueReviews().length === 0); S.fastForwardDays(5); assert(S.dueReviews().some(r => r.id === 'quad_app'), '快进后应到期'); });
+
+    /* ---------- RAG ---------- */
+    group('RAG 检索接地 (PRD 7.1)');
+    test('知识库 21 条', () => eq(QisiKB.KB.length, 21));
+    test('应用题检索命中面积/列方程步骤', () => {
+      const ids = R.retrieve(D.problemById('p_garden').stem, 'quad_app', 3).map(h => h.id);
+      assert(ids.indexOf('k_quadapp_geo') >= 0 || ids.indexOf('k_quadapp_steps') >= 0, '未命中相关知识：' + ids.join(','));
+    });
+    test('检索总返回 ≤ k 条且非空', () => { const h = R.retrieve('随便', 'poly', 2); assert(h.length > 0 && h.length <= 2); });
+
+    /* ---------- 防泄题后置校验（放最后：本用例会临时改写 QisiLLM，避免污染其它同步用例） ---------- */
+    group('防泄题后置校验 (PRD 7.3)');
+    test('LLM 草稿在 hintLevel<4 含最终答案 → 被拦截 + leak_blocked', () => {
+      const orig = { enabled: QisiLLM.enabled, start: QisiLLM.start, turn: QisiLLM.turn };
+      QisiLLM.enabled = () => true;
+      QisiLLM.start = () => Promise.resolve({ messages: [{ text: '先想第一步', cls: '' }], hintLevel: 0, done: false });
+      QisiLLM.turn = () => Promise.resolve({ messages: [{ text: '答案就是 4 米', cls: '' }], hintLevel: 1, done: false });
+      const p = D.problemById('p_garden'), s = E.createSession(p, null);
+      return Promise.resolve(E.start(s)).then(() => E.submit(s, 'x')).then(o => {
+        Object.assign(QisiLLM, orig);   // 恢复
+        assert(o.messages[0].text.indexOf('4') < 0, '泄题草稿未被拦截（答案仍出现）');
+        assert(s.leakBlocked >= 1, '未触发 leak_blocked 计数');   // session 本地计数，免竞态
+      });
+    });
+
+    /* ---------- 渲染结果（等所有异步用例完成） ---------- */
+    Promise.all(promises).then(render);
+
+    function render() {
+      let total = 0, passed = 0, html = '';
+      groups.forEach(g => {
+        html += '<div class="grp">' + g.name + '</div>';
+        g.cases.forEach(c => {
+          total++; if (c.pass) passed++;
+          html += '<div class="case ' + (c.pass ? 'pass' : 'fail') + '"><span class="i">' + (c.pass ? '✓' : '✗') + '</span>' +
+            '<span>' + c.name + '</span>' + (c.pass ? '' : '<span class="err">' + esc(c.err) + '</span>') + '</div>';
+        });
+      });
+      document.getElementById('results').innerHTML = html;
+      const sum = document.getElementById('summary');
+      sum.className = passed === total ? 'ok' : 'bad';
+      sum.textContent = (passed === total ? '✓ 全部通过' : '✗ 有失败') + '  ' + passed + ' / ' + total;
+    }
+    function esc(s) { return String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+  })();
+  </script>
+</body>
+</html>
